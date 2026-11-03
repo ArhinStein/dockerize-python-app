@@ -1,39 +1,42 @@
-# ============================================
-# Docker Compose Challenge
-# ============================================
-#
-# YOUR TASK: Create a docker-compose.yml that:
-# 1. Runs the API (build from Dockerfile)
-# 2. Runs Redis (use redis:7-alpine image)
-# 3. Connects them on the same network
-# 4. Uses volumes for development
-# 5. Includes health checks
-#
-# Hints:
-# - Use 'depends_on' to start Redis before API
-# - Mount ./src:/app/src for live code reload
-# - Set REDIS_URL=redis://redis:6379
-# - Add healthcheck for both services
-#
-# ============================================
-
-# TODO: Replace this with your implementation!
-
 version: '3.8'
 
 services:
+  # Python API
   api:
-    # TODO: Configure the API service
-    # - build from current directory
-    # - expose port 5000
-    # - set environment variables
-    # - mount source code volume
-    # - depend on redis
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile
     ports:
       - "5000:5000"
+    environment:
+      - FLASK_ENV=development
+      - FLASK_DEBUG=1
+      - REDIS_URL=redis://redis:6379
+    volumes:
+      - ./src:/app/src:ro
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/health')"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+    restart: unless-stopped
 
-  # TODO: Add redis service
-  # redis:
-  #   image: redis:7-alpine
-  #   ...
+  # Redis cache
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    restart: unless-stopped
+
+volumes:
+  redis_data:
